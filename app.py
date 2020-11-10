@@ -22,23 +22,22 @@ import prov.dot
 
 import traceback
 
-import StringIO
 import io
 
 import cgi
 
-import urllib2, requests, base64
+import requests, base64
 
 from config import CONFIG
-from config import PROVSTORE 
+from config import PROVSTORE
 
 import datetime
- 
+
 
 
 #bad test
 sys.path.insert(0, '/data/EnvriProvTemplates/provtemplates')
-import provconv
+from provtemplates import provconv
 
 class CustomFlask(Flask):
   jinja_options = Flask.jinja_options.copy()
@@ -51,7 +50,7 @@ class CustomFlask(Flask):
 	comment_end_string='#)',
   ))
 
-def render(result=None, popup_js=''): 
+def render(result=None, popup_js=''):
 	render_template('index.html',
 		result=result,
 		popup_js=popup_js,
@@ -70,8 +69,8 @@ def validateJwtUser(user, site):
 		#log.info("INFO " + repr(jwt_data))
 		ok = ok or (jwt_data["userid"] =='30405800' and jwt_data["siteid"]=='3')
 		return ok
-	except Exception, e:
-		#log.info("ERROR " + str(e))	
+	except Exception as e:
+		#log.info("ERROR " + str(e))
 		return False
 	#workaround
 	#return True
@@ -89,9 +88,9 @@ jwt_code=""
 
 curRes=None
 #handler = RotatingFileHandler('/var/www/templateConf/foo.log', maxBytes=10000, backupCount=1)
-handler = logging.StreamHandler(stream=sys.stderr)
+handler = logging.StreamHandler(stream=sys.stdout)
 log=logging.getLogger(__name__)
-log.setLevel(logging.INFO)
+log.setLevel(logging.DEBUG)
 log.addHandler(handler)
 #log.addHandler(handler)
 
@@ -101,7 +100,7 @@ db = client.TemplateData
 
 def getTemplateByID(id):
 	global db
-	print "GET Template by ID"
+	print ("GET Template by ID")
 	try:
 		template = db.Templates.find_one({'_id':ObjectId(id)})
 
@@ -151,12 +150,12 @@ def getTemplateByID(id):
 				templateDetail['retr_url_json']=template['retr_url_json']
 			except:
 				pass
-		except Exception, e:
+		except Exception as e:
 			return str(e)
 
 		#return templateDetail
 		return json.dumps(templateDetail)
-	except Exception, e:
+	except Exception as e:
 		return str(e)
 
 @application.route('/updateTemplate',methods=['POST'])
@@ -182,13 +181,13 @@ def updateTemplate():
 			prov = templateInfo['prov']
 			provsvg = templateInfo['provsvg']
 			retr_url_provn=templateInfo['retr_url_provn']
-                        retr_url_trig=templateInfo['retr_url_trig']
-                        retr_url_rdfxml=templateInfo['retr_url_rdfxml']
-                        retr_url_xml=templateInfo['retr_url_xml']
-                        retr_url_json=templateInfo['retr_url_json']
+			retr_url_trig=templateInfo['retr_url_trig']
+			retr_url_rdfxml=templateInfo['retr_url_rdfxml']
+			retr_url_xml=templateInfo['retr_url_xml']
+			retr_url_json=templateInfo['retr_url_json']
 
 			log.debug("provsvg " + repr(provsvg))
-		
+
 
 			db.Templates.update_one({'_id':ObjectId(templateId)},{'$set':{
 				'title':title,
@@ -203,16 +202,15 @@ def updateTemplate():
 				'prov':prov,
 				'provsvg':provsvg,
 				'retr_url_provn':retr_url_provn,
-                        	'retr_url_trig':retr_url_trig,
-                        	'retr_url_rdfxml':retr_url_rdfxml,
-                        	'retr_url_xml':retr_url_xml,
-                        	'retr_url_json':retr_url_json
-
+				'retr_url_trig':retr_url_trig,
+				'retr_url_rdfxml':retr_url_rdfxml,
+				'retr_url_xml':retr_url_xml,
+				'retr_url_json':retr_url_json
 			}})
 			return jsonify(status='OK',message='updated successfully')
 		else:
 			return jsonify(status='Unauthorized',message='')
-	except Exception, e:
+	except Exception as e:
 		return jsonify(status='ERROR',message=str(e))
 
 @application.route("/deleteTemplate",methods=['POST'])
@@ -231,7 +229,7 @@ def deleteTemplate():
 			return jsonify(status='OK',message='deletion successful'), 200
 		else:
 			return jsonify(status='Unauthorized',message=''), 401
-	except Exception, e:
+	except Exception as e:
 		if templateId:
 			log.error("Failed Deleting template with id " + str(templateId) + " msg: " + str(e))
 		else:
@@ -243,14 +241,14 @@ def deleteTemplate():
 @jwt_optional
 def getTemplateList():
 	global db
-	print "GET REPO LIST"
+	print ("GET REPO LIST")
 	try:
 		templates = db.Templates.find()
 
 		templateList = []
 
 		for template in templates:
-			print template
+			print (template)
 			owner=0
 
 			if validateJwtUser(str(template['owner']['userid']), str(template['owner']['siteid'])):
@@ -286,7 +284,7 @@ def getTemplateList():
 			except:
 				pass
 			templateList.append(templateItem)
-	except Exception,e:
+	except Exception as e:
 		log.error("ERROR : " + str(e))
 		return str(e)
 	return json.dumps(templateList)
@@ -298,7 +296,7 @@ def getTemplate():
 
 	try:
 		return(getTemplateByID(request.json['id']))
-	except  Exception, e:
+	except  Exception as e:
 		return str(e)
 
 @application.route("/addTemplate",methods=['POST'])
@@ -351,29 +349,29 @@ def addTemplate():
 		retr_url_dict['retr_url_rdfxml']=baseurl+"/templates/"+str(inserted.inserted_id)+"/rdfxml"
 		retr_url_dict['retr_url_xml']=baseurl+"/templates/"+str(inserted.inserted_id)+"/provxml"
 		retr_url_dict['retr_url_json']=baseurl+"/templates/"+str(inserted.inserted_id)+"/provjson"
-	
+
 		added_links=db.Templates.update_one(
 			{ '_id' : inserted.inserted_id},
-			{ "$set" :  retr_url_dict } ) 
-	
+			{ "$set" :  retr_url_dict } )
+
 		log.error(repr(added_links))
-	
+
 
 		return jsonify(status='OK',message='inserted successfully'), 200
 
-	except Exception,e:
+	except Exception as e:
 		log.error(str(e))
 		return jsonify(status='ERROR',message=str(e)), 500
 
 @application.route('/templates', methods=['GET'])
 def getTemplates():
-	print "getTemplates"
+	print ("getTemplates")
 	#return list
 	templates = db.Templates.find()
 	templateDict = {}
 	for template in templates:
 		tData=json.loads(getTemplateByID(str(template['_id'])))
-		templateDict[str(template['_id'])]={ 	"title" 	: tData["title"], 
+		templateDict[str(template['_id'])]={ 	"title" 	: tData["title"],
 							"description" 	: tData["description"],
 							"creator" 	: tData["creator"],
 							"created" 	: tData["created"],
@@ -382,17 +380,17 @@ def getTemplates():
 
 @application.route('/templates/<id>', methods=['GET'])
 def getTemplatesId(id="",):
-	print "getTemplateID"
+	print ("getTemplateID")
 	try:
 		return(getTemplateByID(id))
-	except  Exception, e:
+	except  Exception as e:
 		return str(e)
 
 
 def provRead(source, format=None):
 	from prov.model import ProvDocument
 	from prov.serializers import Registry
-	
+
 	Registry.load_serializers()
 	serializers = Registry.serializers.keys()
 
@@ -400,7 +398,7 @@ def provRead(source, format=None):
 		try:
 			ret=ProvDocument.deserialize(source=source, format=format.lower())
 			return ret
-		except Exception, e:
+		except Exception as e:
 			log.error(e)
 			raise TypeError(e)
 
@@ -422,7 +420,7 @@ def getTemplatesIdFormat(id="", format=""):
 		tmpl=json.loads(getTemplateByID(id))
 		#log.error(repr(tmpl))
 		provdata=tmpl["prov"]
-		log.debug(provdata)	
+		log.debug(provdata)
 		#tb=io.TextIOBase(provdata)
 		log.debug("Write provdata into stream obj")
 		tb=io.StringIO()
@@ -434,9 +432,9 @@ def getTemplatesIdFormat(id="", format=""):
 		#log.error(tb.getvalue())
 		tb.seek(0)
 		#log.error(tb.read())
-		provrep=provRead(tb)	
+		provrep=provRead(tb)
 
-		
+
 
 		log.debug(repr(provrep.namespaces))
 
@@ -450,9 +448,9 @@ def getTemplatesIdFormat(id="", format=""):
 		#fix namespace issuces
 		for b in provrep.bundles:
 			log.debug(repr(b.namespaces))
-			b._namespaces=provrep._namespaces	
-			#b._namespaces=prov.model.NamespaceManager()	
-	
+			b._namespaces=provrep._namespaces
+			#b._namespaces=prov.model.NamespaceManager()
+
 		res=None
 		mime=None
 		filename=None
@@ -479,10 +477,10 @@ def getTemplatesIdFormat(id="", format=""):
 			filename=id+".template.provn"
 		else:
 			return("Format " + format + " not implemented")
-		#log.error(res)	
-		return Response(res, mimetype=mime, headers={ "Content-Disposition":"attachment;filename="+filename})	
-	
-	except  Exception, e:
+		#log.error(res)
+		return Response(res, mimetype=mime, headers={ "Content-Disposition":"attachment;filename="+filename})
+
+	except  Exception as e:
 		return str(e) +  traceback.format_exc()
 
 @application.route('/templates/<id>/expand', methods=['GET', 'POST'])
@@ -501,24 +499,24 @@ def getTemplatesIdExpand(id=""):
 		fmt=None
 
 		#check get or post
-		if request.method=="GET":		
+		if request.method=="GET":
 
 			writeprovarg=request.args.get('writeprov')
-	
+
 			bindvernew=request.args.get('bindver')
-	
+
 			bindings=request.args.get('bindings')
-	
+
 			fmt=request.args.get('fmt')
 
 		elif request.method=="POST":
 			bindings=None
 			try:
 				bindings = request.get_data()
-			except Exception, e:
+			except Exception as e:
 				 log.info(str(e))
 
-			log.info(unicode(bindings))
+			log.info(str(bindings))
 
 			try:
 				writeprovarg=request.args.get('writeprov')
@@ -528,7 +526,7 @@ def getTemplatesIdExpand(id=""):
 
 			try:
 				bindvernew=request.args.get('bindver')
-				#bindvernew=input_json['bindver']			
+				#bindvernew=input_json['bindver']
 			except:
 				pass
 
@@ -537,7 +535,7 @@ def getTemplatesIdExpand(id=""):
 				#fmt=input_json['fmt']
 			except:
 				pass
-			
+
 		if writeprovarg=="true":
 			writeprov=True
 		if bindvernew=="v3":
@@ -556,8 +554,8 @@ def getTemplatesIdExpand(id=""):
 		#		outfmt=outfmt.replace("xml", "")
 		#
 		#		else:
-		
-				
+
+
 		log.debug(bindings)
 		log.debug(outfmt)
 
@@ -567,7 +565,7 @@ def getTemplatesIdExpand(id=""):
 		if bindver=="v2":
 			#create stream from bindings
 			bindstream=io.StringIO()
-			bindstream.write(unicode(bindings))
+			bindstream.write(str(bindings))
 			bindstream.seek(0)
 			bindings_doc=provRead(bindstream)
 			bindings_dict=provconv.read_binding(bindings_doc)
@@ -575,8 +573,8 @@ def getTemplatesIdExpand(id=""):
 		else:
 			bindings_doc=json.loads(bindings)
 			bindings=provconv.read_binding_v3(bindings_doc)
-			bindings_dict=bindings["binddict"]	
-			bindings_ns=bindings["namespaces"]	
+			bindings_dict=bindings["binddict"]
+			bindings_ns=bindings["namespaces"]
 
 		templatestream=io.StringIO()
 		templatedata=json.loads(getTemplateByID(id))
@@ -588,7 +586,7 @@ def getTemplatesIdExpand(id=""):
 		log.debug(bindings_ns)
 		log.debug(bindings_doc)
 		log.debug(template)
-		
+
 		exp=provconv.instantiate_template(template, bindings_dict)
         	#if outfmt in ["xml", "provn", "json"]:
                	# 	return(exp.serialize(format=outfmt))
@@ -596,7 +594,7 @@ def getTemplatesIdExpand(id=""):
         	#       	if outfmt == "rdf":
           	#              	outfmt="xml"
            	#     		return(exp.serialize(format="rdf", rdf_format=outfmt))
-		
+
 		if not writeprov:
 			res=None
 			mime=None
@@ -624,9 +622,9 @@ def getTemplatesIdExpand(id=""):
 				filename=id+".expanded.provn"
 			else:
 				return("Format " + format + " not implemented")
-			#log.error(res)	
-	
-			return Response(res, mimetype=mime, headers={ "Content-Disposition":"attachment;filename="+filename})	
+			#log.error(res)
+
+			return Response(res, mimetype=mime, headers={ "Content-Disposition":"attachment;filename="+filename})
 		else:
 			#we always use provxml
 
@@ -634,10 +632,10 @@ def getTemplatesIdExpand(id=""):
 			for b in exp.bundles:
 				log.debug(b.identifier)
 				ident=b.identifier
-			try:	
+			try:
 				log.debug("Writing to Provstore")
 				res=exp.serialize(None, "rdf", rdf_format="turtle")
-				
+
 
 				log.debug("Serialized")
 				if ident==None:
@@ -648,9 +646,9 @@ def getTemplatesIdExpand(id=""):
 				log.error("Writing triples to Provstore with ident " + ident)
 				#add sime metadata
 
-				metatrips=" " + ident + " dct:created " + "'"+datetime.datetime.now().isoformat()+"'^^xsd:datetime ." 
-				extra_ns="@prefix dct: <http://purl.org/dc/terms/> . @prefix xsd: <http://www.w3.org/2001/XMLSchema#> . " 
-				
+				metatrips=" " + ident + " dct:created " + "'"+datetime.datetime.now().isoformat()+"'^^xsd:datetime ."
+				extra_ns="@prefix dct: <http://purl.org/dc/terms/> . @prefix xsd: <http://www.w3.org/2001/XMLSchema#> . "
+
 
 				datastring=extra_ns + res + metatrips
 
@@ -668,26 +666,26 @@ def getTemplatesIdExpand(id=""):
 
 				log.error(repr(r))
 				return Response(r.text)
-			except Exception, e:
-				return Response("Failed to write result with exception " + str(e))				
-				
+			except Exception as e:
+				return Response("Failed to write result with exception " + str(e))
+
 			#we need a bundle name
 			#we create a named graph consisting of the template ID and a timestamp and attach these values to the named graph
-						
 
-				
 
-	except Exception,e:
+
+
+	except Exception as e:
 		log.error("ERROR : " + str(e))
 		return (str(e) + traceback.format_exc())
-	
-		
+
+
 
 
 @application.route('/renderProvFile', methods=['POST'])
 @jwt_required
 def renderProvFile():
-	print "renderProvFile"
+	print ("renderProvFile")
 	dor="error"
 	try:
 		fileData=request.json['provfile']
@@ -703,9 +701,9 @@ def renderProvFile():
 				outfmt="json"
 			if fmt=="prov-o trig":
 				outfmt="rdf"
-		tst=provRead(tb, outfmt)	
+		tst=provRead(tb, outfmt)
 		dor=prov.dot.prov_to_dot(tst)
-	except Exception,e:
+	except Exception as e:
 		log.error("ERROR : " + str(e))
 		outmsg='<html> \
 				<body> \
@@ -731,7 +729,7 @@ def renderProvFile():
 
 @application.route('/')
 def showTemplateList():
-	print "SHOWREPOLIST"
+	print ("SHOWREPOLIST")
 	return render_template('index.html',
 		result=None,
 		popup_js='',

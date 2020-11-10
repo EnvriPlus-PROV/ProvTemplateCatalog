@@ -25,13 +25,11 @@ PROV_TMPL_SERVERNAME="prov-template"
 PROV_TMPL_DATABASE="/tmp"
 PROV_TMPL_BASEURL_HOST="localhost"
 k8s="no"
-while getopts h:d:b:a:k option ; do
+while getopts h:d:a:k option ; do
     case ${option} in
         (h) PROV_TMPL_SERVERNAME=${OPTARG}
             ;;
         (d) PROV_TMPL_DATABASE=${OPTARG}
-            ;;
-        (b) PROV_TMPL_BASEURL_HOST=${OPTARG}
             ;;
         (a) oauth_key_file=${OPTARG}
             ;;
@@ -45,8 +43,8 @@ while getopts h:d:b:a:k option ; do
 done
 
 . ${oauth_key_file} || exit 1
- 
-if [ "$k82" = "no" ] ; then
+
+if [ "$k8s" = "no" ] ; then
     mkdir -p ${PROV_TMPL_DATABASE} || exit 1
 fi
 
@@ -72,11 +70,13 @@ if [[ ! -f ${confdir}/prov-template.conf || ! -f ${confdir}/prov-template-k8s.co
     mkdir -p -m 755 ${confdir}
     sed -e "s/prov-template/$PROV_TMPL_SERVERNAME/" example_conf_apache2_sites-enabled.conf >  ${confdir}/prov-template.conf
     sed -e "s/prov-template/$PROV_TMPL_SERVERNAME/" kubernetes/prov-template.conf >  ${confdir}/prov-template-k8s.conf
+    sed -ri -e 's!^(\s*CustomLog)\s+\S+!\1 /proc/self/fd/1!g'  -e 's!^(\s*ErrorLog)\s+\S+!\1 /proc/self/fd/2!g' \
+		"${confdir}/prov-template.conf"
 fi
 
 PROV_TMPL_JWT_SECRET=`pwgen -1`
 if [[ "${k8s}" = "no" && -f docker-compose.yml ]] ; then
-    export PROV_TMPL_DATABASE PROV_TMPL_SERVERNAME PROV_TMPL_BASEURL_HOST PROV_TMPL_JWT_SECRET
+    export PROV_TMPL_DATABASE PROV_TMPL_SERVERNAME PROV_TMPL_JWT_SECRET
 
     export PROV_TMPL_github_KEY PROV_TMPL_github_SECRET
     export PROV_TMPL_linkedin_KEY PROV_TMPL_linkedin_SECRET
@@ -85,13 +85,13 @@ if [[ "${k8s}" = "no" && -f docker-compose.yml ]] ; then
     docker-compose up -d
 elif [[ "${k8s}" = "yes" && -f kubernetes/prov-template.yaml ]] ; then
     cp ${confdir}/prov-template-k8s.conf ${confdir}/prov-template.conf
-    kubectl create configmap prov-template-conf --from-file=${confdir}/prov-template.conf
-    kubectl create configmap prov-template-oauth --from-env-file=${oauth_key_file}
-    kubectl create configmap server-url-jwt-conf \
+    kubectl -n swirrl create -f kubernetes/mongodb.yaml
+    kubectl -n swirrl create configmap prov-template-conf --from-file=${confdir}/prov-template.conf
+    kubectl -n swirrl create configmap prov-template-oauth --from-env-file=${oauth_key_file}
+    kubectl -n swirrl create configmap server-url-jwt-conf \
             --from-literal=prov-tmpl.servername=${PROV_TMPL_SERVERNAME} \
-            --from-literal=prov-tmpl.baseurl=${PROV_TMPL_BASEURL_HOST} \
             --from-literal=prov-tmpl.jwt=${PROV_TMPL_JWT_SECRET}
-    kubectl create -f kubernetes/prov-template.yaml
+    kubectl -n swirrl create -f kubernetes/prov-template.yaml
 else
     echo "No docker-compose.yml or kubernetes/prov-template.yaml file found."
     exit 1
